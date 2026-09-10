@@ -1,0 +1,78 @@
+name: Atualizar índice de pesquisa
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/update-search-index.yml"
+      - "scripts/**"
+      - "package.json"
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+    - cron: "13 4 * * 0"
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Reconstruir todo o índice"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: search-index
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - name: Obter repositório
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Escolher actualização
+        id: mode
+        shell: bash
+        run: |
+          mode="incremental"
+          if [[ "${{ github.event_name }}" == "push" ]]; then mode="full"; fi
+          if [[ "${{ github.event.schedule }}" == "13 4 * * 0" ]]; then mode="full"; fi
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.full }}" == "true" ]]; then mode="full"; fi
+          if [[ "$mode" == "incremental" ]]; then
+            mkdir -p data
+            if ! curl -fsSL "https://paulomonte123456.github.io/termometro-search-index/estado.json" -o data/search-state.json; then
+              mode="full"
+            fi
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
+      - name: Gerar índice
+        id: index
+        shell: bash
+        run: |
+          output="$(node scripts/build-search-index.mjs --mode "${{ steps.mode.outputs.mode }}")"
+          printf '%s\n' "$output"
+          changed="$(printf '%s\n' "$output" | sed -n 's/^INDEX_CHANGED=//p' | tail -n 1)"
+          echo "changed=${changed:-false}" >> "$GITHUB_OUTPUT"
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Preparar publicação
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Publicar índice
+        uses: actions/deploy-pages@v4
