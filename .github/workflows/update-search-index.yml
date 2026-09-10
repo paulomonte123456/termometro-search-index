@@ -61,10 +61,8 @@ jobs:
         id: index
         shell: bash
         run: |
-          output="$(node scripts/build-search-index.mjs --mode "${{ steps.mode.outputs.mode }}")"
-          printf '%s\n' "$output"
-          changed="$(printf '%s\n' "$output" | sed -n 's/^INDEX_CHANGED=//p' | tail -n 1)"
-          echo "changed=${changed:-false}" >> "$GITHUB_OUTPUT"
+          node --test
+          node scripts/build-search-index.mjs --mode "${{ steps.mode.outputs.mode }}"
 
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v5

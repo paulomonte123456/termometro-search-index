@@ -12,6 +12,20 @@ const DEFAULT_DELAY_MS = 120;
 const DEFAULT_POST_CONCURRENCY = 4;
 const DEFAULT_MAX_PAGES = 1_000;
 
+// V8 pode conservar todo o HTML original através de uma pequena substring.
+// Copiar os campos que sobrevivem à leitura permite libertar essa página.
+function detachedString(value) {
+  return Buffer.from(String(value ?? ''), 'utf8').toString('utf8');
+}
+
+function detachedFields(record) {
+  return Object.fromEntries(Object.entries(record).map(([key, value]) => [key, detachedString(value)]));
+}
+
+function memoryLabel() {
+  return `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB de heap`;
+}
+
 function parseArgs(argv) {
   const args = { mode: 'incremental', state: 'data/search-state.json', outputDir: 'public', maxPages: DEFAULT_MAX_PAGES };
   for (let i = 0; i < argv.length; i += 1) {
@@ -93,21 +107,21 @@ export function extractArchivePosts(html, baseUrl = SITE_ORIGIN) {
     const content = firstMatch(fragment, /<div\b[^>]*class=["'][^"']*\bblog-content\b[^"']*["'][^>]*>([\s\S]*?)(?=<div\b[^>]*class=["'][^"']*\bblog-comments-bottom\b)/i);
     const image = content.match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i)?.[1] || fragment.match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i)?.[1] || '';
     const pathValue = normalisePath(absoluteUrl(attr(hrefTag, 'href'), baseUrl));
-    return {
+    return detachedFields({
       id,
       path: pathValue,
       title: stripHtml(titleTag),
       date: parseDate(stripHtml(dateText)),
       image: absoluteUrl(image, baseUrl),
       text: stripHtml(content).slice(0, 4000)
-    };
+    });
   }).filter((post) => post.path);
 }
 
 export function extractNextPage(html, currentUrl) {
   const nav = html.match(/<div\b[^>]*class=["'][^"']*\bblog-page-nav-previous\b[^"']*["'][^>]*>[\s\S]{0,1800}?<a\b[^>]*>/i);
   const href = nav ? attr(nav[0].match(/<a\b[^>]*>/i)?.[0] || '', 'href') : '';
-  return href ? absoluteUrl(href, currentUrl) : '';
+  return href ? detachedString(absoluteUrl(href, currentUrl)) : '';
 }
 
 function cdata(xml, tag) {
@@ -116,7 +130,7 @@ function cdata(xml, tag) {
 }
 
 export function parseFeed(xml) {
-  return (String(xml).match(/<item\b[\s\S]*?<\/item>/gi) || []).map((item) => ({
+  return (String(xml).match(/<item\b[\s\S]*?<\/item>/gi) || []).map((item) => detachedFields({
     path: normalisePath(cdata(item, 'link')),
     title: stripHtml(cdata(item, 'title')),
     date: parseDate(cdata(item, 'pubDate')),
@@ -167,8 +181,9 @@ async function crawlArchive(maxPages) {
     visited.add(url);
     const response = await fetchText(url);
     if (response.missing) break;
-    for (const post of extractArchivePosts(response.text, url)) posts.set(post.path, post);
-    console.log(`[arquivo] página ${page}: ${extractArchivePosts(response.text, url).length} posts; total ${posts.size}.`);
+    const pagePosts = extractArchivePosts(response.text, url);
+    for (const post of pagePosts) posts.set(post.path, post);
+    console.log(`[arquivo] página ${page}: ${pagePosts.length} posts; total ${posts.size}; ${memoryLabel()}.`);
     url = extractNextPage(response.text, url);
     if (url) await sleep(Number(process.env.REQUEST_DELAY_MS || DEFAULT_DELAY_MS));
   }
@@ -183,14 +198,14 @@ async function enrichPost(post) {
     const details = extractArchivePosts(response.text, `${SITE_ORIGIN}${post.path}`)[0] || {};
     const fragment = extractBlogFragments(response.text)[0]?.html || response.text;
     const content = firstMatch(fragment, /<div\b[^>]*class=["'][^"']*\bblog-content\b[^"']*["'][^>]*>([\s\S]*?)(?=<div\b[^>]*class=["'][^"']*\bblog-comments-bottom\b)/i);
-    return {
+    return detachedFields({
       id: details.id || post.id,
       path: post.path,
       title: details.title || post.title,
       date: details.date || post.date,
       image: details.image || post.image,
       text: stripHtml(content).slice(0, 4000)
-    };
+    });
   } catch (error) {
     console.warn(`[post] falha em ${post.path}: ${error.message}`);
     return post;
@@ -199,22 +214,30 @@ async function enrichPost(post) {
 
 function cleanPost(post) {
   const postPath = normalisePath(post.path);
-  return {
+  return detachedFields({
     id: String(post.id || crypto.createHash('sha1').update(postPath).digest('hex').slice(0, 16)),
     path: postPath,
     title: String(post.title || '').trim(),
     date: post.date || '',
     image: post.image || '',
     text: String(post.text || '').trim().slice(0, 4000)
-  };
+  });
 }
 
 async function buildFull(maxPages) {
+  console.log('[fase 1/3] Recolher endereços no arquivo do blog.');
   const archivePosts = await crawlArchive(maxPages);
   const concurrency = Number(process.env.POST_CONCURRENCY || DEFAULT_POST_CONCURRENCY);
+  let completed = 0;
+  console.log(`[fase 2/3] Ler ${archivePosts.length} publicações, até ${concurrency} em simultâneo.`);
   return (await mapWithLimit(archivePosts, concurrency, async (post, index) => {
     if (index > 0) await sleep(Number(process.env.REQUEST_DELAY_MS || DEFAULT_DELAY_MS));
-    return cleanPost(await enrichPost(post));
+    const result = cleanPost(await enrichPost(post));
+    completed += 1;
+    if (completed % 25 === 0 || completed === archivePosts.length) {
+      console.log(`[posts] ${completed}/${archivePosts.length} processados; ${memoryLabel()}.`);
+    }
+    return result;
   })).filter((post) => post.path);
 }
 
@@ -305,10 +328,15 @@ async function main() {
   } else {
     ({ posts, changed } = await buildIncremental(previous));
   }
+  console.log(`[fase 3/3] Construir ficheiros de palavras para ${posts.length} posts; ${memoryLabel()}.`);
   const index = await writeIndex(statePath, outputDir, posts);
   console.log(changed ? `Índice ${args.mode} gravado com ${index.posts.length} posts.` : `Nenhum post novo ou alterado; ${index.posts.length} posts republicados.`);
   console.log(`INDEX_CHANGED=${changed ? 'true' : 'false'}`);
 }
 
 const direct = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (direct) main().catch((error) => { console.error(error); process.exitCode = 1; });
+if (direct) {
+  const heartbeat = setInterval(() => console.log(`[activo] ${memoryLabel()}`), 30_000);
+  main().catch((error) => { console.error(error); process.exitCode = 1; })
+    .finally(() => clearInterval(heartbeat));
+}
