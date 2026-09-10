@@ -119,36 +119,26 @@
       badge.className = 'destaque-recomendado';
       badge.textContent = '🔎 Resultado recomendado';
 
+      badge.style.cssText =
+        'background:rgb(255,192,12);color:#000;padding:5px 10px;' +
+        'font-weight:bold;font-size:11px;border-radius:0;position:absolute;' +
+        'margin-left:-21px;text-transform:uppercase;letter-spacing:2px;';
+
       li.appendChild(badge);
     }
 
-    const row = document.createElement('div');
-    row.className = 'ceti-search-row';
-
     if (post.image) {
-      const thumbLink = document.createElement('a');
+      const thumb = document.createElement('div');
 
-      thumbLink.href = post.path;
-      thumbLink.className = 'ceti-search-thumb-link';
+      thumb.className = 'search-thumb';
+      thumb.style.backgroundImage =
+        `url('${post.image.replace(/'/g, '%27')}')`;
 
-      const image = document.createElement('img');
-
-      image.className = 'ceti-search-thumb';
-      image.src = post.image;
-      image.alt = '';
-      image.loading = 'lazy';
-
-      thumbLink.appendChild(image);
-      row.appendChild(thumbLink);
+      li.appendChild(thumb);
     }
 
-    const content = document.createElement('div');
-    content.className = 'ceti-search-card-content';
-
-    const titleLink = document.createElement('a');
-
-    titleLink.href = post.path;
-    titleLink.className = 'ceti-search-title-link';
+    const link = document.createElement('a');
+    link.href = post.path;
 
     const date = formatDate(post.date);
 
@@ -158,7 +148,7 @@
       dateEl.className = 'blog-date';
       dateEl.textContent = date;
 
-      titleLink.appendChild(dateEl);
+      link.appendChild(dateEl);
     }
 
     const title = document.createElement('h3');
@@ -167,8 +157,8 @@
       post.title ||
       post.path.split('/').pop().replace(/-/g, ' ');
 
-    titleLink.appendChild(title);
-    content.appendChild(titleLink);
+    link.appendChild(title);
+    li.appendChild(link);
 
     const description = document.createElement('p');
 
@@ -178,9 +168,7 @@
         }`
       : '';
 
-    content.appendChild(description);
-    row.appendChild(content);
-    li.appendChild(row);
+    li.appendChild(description);
 
     return li;
   }
@@ -208,95 +196,21 @@
       }
 
       #wsite-search-list.ceti-search-ready {
-        display: block !important;
         visibility: visible;
       }
 
-      #wsite-search-list li.ceti-search-result {
-        display: block !important;
+      .ceti-search-result {
         position: relative;
-        box-sizing: border-box;
-        width: 100%;
-        margin: 0 0 14px !important;
-        padding: 0 !important;
-        clear: both;
-        overflow: hidden;
-        background: #fff;
-        border-radius: 16px;
-        box-shadow: 0 2px 12px rgba(0, 0, 0, .08);
       }
 
-      .ceti-search-row {
-        display: flex !important;
-        align-items: flex-start;
-        gap: 20px;
-        padding: 18px 20px 20px !important;
-        box-sizing: border-box;
-      }
-
-      .ceti-search-thumb-link {
-        display: block !important;
-        flex: 0 0 190px;
-        width: 190px !important;
-        height: 125px !important;
-        overflow: hidden;
-        border-radius: 10px;
-      }
-
-      .ceti-search-thumb {
-        display: block !important;
-        width: 190px !important;
-        height: 125px !important;
-        object-fit: cover;
-        border-radius: 10px;
-      }
-
-      .ceti-search-card-content {
-        display: block !important;
-        flex: 1 1 auto;
-        min-width: 0;
-      }
-
-      .ceti-search-title-link {
-        display: block !important;
-        color: inherit;
-        text-decoration: none;
-      }
-
-      .ceti-search-card-content h3 {
-        margin: 3px 0 8px !important;
-        line-height: 1.2;
-      }
-
-      .ceti-search-card-content .blog-date {
-        display: block !important;
-        margin: 0 0 7px !important;
-      }
-
-      .ceti-search-card-content p {
-        margin: 0 !important;
-        line-height: 1.45;
-      }
-
-      .ceti-search-result .destaque-recomendado {
-        display: block;
-        position: relative;
-        background: #ffc00c;
-        color: #000;
-        padding: 7px 12px;
-        font-weight: bold;
-        font-size: 11px;
-        border-radius: 0;
-        text-transform: uppercase;
-        letter-spacing: 2px;
+      .ceti-recommended-filter {
+        cursor: pointer;
       }
 
       .ceti-recommended-toggle {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        margin: 10px 0 16px;
-        font-size: 14px;
         cursor: pointer;
       }
 
@@ -307,15 +221,15 @@
         cursor: pointer;
       }
 
-      #wsite-search-sidebar {
-        visibility: visible;
-      }
-
       .wsite-search-filter-entries li:nth-child(1),
       .wsite-search-filter-entries li:nth-child(2),
       .wsite-search-filter-entries li:nth-child(4),
       .wsite-search-facet.wsite-search-facet-availability {
         display: none !important;
+      }
+
+      .wsite-search-filter-entries li.ceti-recommended-filter {
+        display: inline-flex !important;
       }
 
       body.blog-filter #wsite-search-product-result-section,
@@ -346,7 +260,8 @@
         width: 100%;
         padding: 6px 10px;
         border: none;
-        background: url(/images/util/inputs/search-input-bg.jpg?1746488149) repeat-x top #fff;
+        background: url(/images/util/inputs/search-input-bg.jpg?1746488149)
+          repeat-x top #fff;
         position: relative;
         z-index: 2;
       }
@@ -354,7 +269,8 @@
       #form-busca-customizada button {
         width: 47px;
         height: 43px;
-        background: url(https://i.imgur.com/3nHyCp5.png) no-repeat center #ffc00c;
+        background: url(https://i.imgur.com/3nHyCp5.png)
+          no-repeat center #ffc00c;
         border: none;
         border-left: 1px solid #a8a8a8;
         cursor: pointer;
@@ -434,20 +350,8 @@
       }
 
       @media (max-width: 600px) {
-        .ceti-search-row {
-          gap: 12px;
-          padding: 14px !important;
-        }
-
-        .ceti-search-thumb-link,
-        .ceti-search-thumb {
-          flex-basis: 96px;
-          width: 96px !important;
-          height: 72px !important;
-        }
-
-        .ceti-search-card-content h3 {
-          font-size: 18px;
+        .ceti-recommended-toggle {
+          font-size: 13px;
         }
       }
     `;
@@ -476,6 +380,10 @@
 
     if (list) list.style.display = 'none';
     if (nav) nav.style.display = 'none';
+
+    const sidebar = document.getElementById('wsite-search-sidebar');
+
+    if (sidebar) sidebar.style.display = 'none';
   }
 
   function limparBloqueioInicial() {
@@ -502,7 +410,8 @@
   }
 
   function setupSidebar() {
-    const filter = new URLSearchParams(location.search).get('filter');
+    const filter =
+      new URLSearchParams(location.search).get('filter');
 
     if (filter === 'blog_post') {
       document.body.classList.add('blog-filter');
@@ -519,13 +428,15 @@
             new URLSearchParams(location.search).get('q') || '';
 
           const searching = palavras(query).length >= 2;
+
           const count = searching
             ? '0'
             : text.match(/\d+/)?.[0] || '';
 
           link.innerHTML =
             `<span style="font-weight:600;">Notícias</span> ` +
-            `<span class="contador-customizado" style="opacity:.6">(${count})</span>`;
+            `<span class="contador-customizado" style="opacity:.6">` +
+            `(${count})</span>`;
 
           link.dataset.filter = 'blog_post';
 
@@ -568,6 +479,10 @@
       return;
     }
 
+    const filterItem = document.createElement('li');
+
+    filterItem.className = 'ceti-recommended-filter';
+
     const label = document.createElement('label');
 
     label.id = 'ceti-recommended-toggle';
@@ -576,6 +491,7 @@
     const checkbox = document.createElement('input');
 
     checkbox.type = 'checkbox';
+
     checkbox.addEventListener('change', () =>
       onChange(checkbox.checked)
     );
@@ -585,8 +501,18 @@
     text.textContent = 'Apenas notícias recomendadas';
 
     label.append(checkbox, text);
+    filterItem.appendChild(label);
 
-    (link.closest('li') || link.parentElement)?.appendChild(label);
+    const blogItem = link.closest('li');
+
+    if (blogItem?.parentElement) {
+      blogItem.parentElement.insertBefore(
+        filterItem,
+        blogItem.nextSibling
+      );
+    } else {
+      link.parentElement?.appendChild(filterItem);
+    }
   }
 
   function setupSearchForm() {
@@ -618,7 +544,10 @@
             placeholder="Buscar..."
             autocomplete="off"
             aria-label="Busca">
-          <button type="submit" aria-label="Pesquisar"></button>
+          <button
+            type="submit"
+            aria-label="Pesquisar">
+          </button>
         </form>
       </div>
     `;
@@ -645,7 +574,8 @@
 
     header?.appendChild(alert);
 
-    const valid = () => palavras(input.value).length >= 2;
+    const valid = () =>
+      palavras(input.value).length >= 2;
 
     form.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -781,13 +711,16 @@
             ).then((r) => r.json())
           ]);
 
-          const queryWords = normalizar(query).split(/\s+/);
+          const queryWords =
+            normalizar(query).split(/\s+/);
 
           const starts = (text) => {
-            const words = normalizar(text).split(/\s+/);
+            const words =
+              normalizar(text).split(/\s+/);
 
             return queryWords.every(
-              (word, index) => words[index]?.startsWith(word)
+              (word, index) =>
+                words[index]?.startsWith(word)
             );
           };
 
@@ -796,15 +729,17 @@
               normalizar(text).includes(word)
             );
 
-          const movieRows = (movies.results || []).filter(
-            (item) =>
-              starts(item.title || '') ||
-              starts(item.original_title || '')
-          );
+          const movieRows =
+            (movies.results || []).filter(
+              (item) =>
+                starts(item.title || '') ||
+                starts(item.original_title || '')
+            );
 
-          const peopleRows = (people.results || []).filter(
-            (item) => starts(item.name || '')
-          );
+          const peopleRows =
+            (people.results || []).filter(
+              (item) => starts(item.name || '')
+            );
 
           const finalMovies = (
             movieRows.length
@@ -824,7 +759,10 @@
                 )
           ).slice(0, 5);
 
-          if (!finalMovies.length && !finalPeople.length) {
+          if (
+            !finalMovies.length &&
+            !finalPeople.length
+          ) {
             return;
           }
 
@@ -903,10 +841,14 @@
           items.length;
 
         items.forEach((el, index) =>
-          el.classList.toggle('active', index === selected)
+          el.classList.toggle(
+            'active',
+            index === selected
+          )
         );
 
-        input.value = items[selected].dataset.texto;
+        input.value =
+          items[selected].dataset.texto;
       }
 
       if (event.key === 'Enter' && selected >= 0) {
@@ -936,11 +878,15 @@
     setupSearchForm();
     setupSidebar();
 
-    const list = document.getElementById('wsite-search-list');
+    const list =
+      document.getElementById('wsite-search-list');
+
     const rawQuery =
       new URLSearchParams(location.search).get('q') || '';
 
-    const termos = [...new Set(palavras(rawQuery))];
+    const termos = [
+      ...new Set(palavras(rawQuery))
+    ];
 
     if (termos.length < 2) {
       showWarning(
@@ -956,6 +902,7 @@
     if (!list) return;
 
     const original = list.innerHTML;
+
     let resultadosAtuais = [];
     let apenasRecomendadas = false;
 
@@ -1011,6 +958,13 @@
       renderizar();
       limparBloqueioInicial();
 
+      const sidebar =
+        document.getElementById('wsite-search-sidebar');
+
+      if (sidebar) {
+        sidebar.style.visibility = 'visible';
+      }
+
       const nav =
         document.getElementById('wsite-search-pagenav');
 
@@ -1026,13 +980,22 @@
       list.innerHTML = original;
       list.classList.remove('ceti-search-pending');
       limparBloqueioInicial();
+
+      const sidebar =
+        document.getElementById('wsite-search-sidebar');
+
+      if (sidebar) {
+        sidebar.style.visibility = 'visible';
+      }
     }
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', iniciar, {
-      once: true
-    });
+    document.addEventListener(
+      'DOMContentLoaded',
+      iniciar,
+      { once: true }
+    );
   } else {
     iniciar();
   }
