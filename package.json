@@ -1,0 +1,11 @@
+{
+  "name": "termometro-search-index",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test",
+    "build:full": "node scripts/build-search-index.mjs --mode full",
+    "build:incremental": "node scripts/build-search-index.mjs --mode incremental"
+  }
+}
