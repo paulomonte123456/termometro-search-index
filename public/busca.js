@@ -194,10 +194,7 @@
         visibility:hidden;
       }
 
-      #wsite-search-list.ceti-search-ready {
-        display:block !important;
-        visibility:visible;
-      }
+      #wsite-search-list.ceti-search-ready { visibility:visible; }
 
       .ceti-search-result {
         position:relative;
@@ -533,57 +530,59 @@
   }
 
   function setupRecommendedToggle(onChange) {
-    const link = document.querySelector(
-      '.wsite-search-filter-entries a[data-filter="blog_post"]'
+  const link = document.querySelector(
+    '.wsite-search-filter-entries a[data-filter="blog_post"]'
+  );
+
+  if (
+    !link ||
+    document.getElementById('ceti-recommended-toggle')
+  ) {
+    return;
+  }
+
+  const filterItem = document.createElement('li');
+
+  filterItem.className = 'ceti-recommended-filter';
+  filterItem.style.setProperty('display', 'inline-flex', 'important');
+  filterItem.style.setProperty('visibility', 'visible', 'important');
+
+  const label = document.createElement('label');
+
+  label.id = 'ceti-recommended-toggle';
+  label.className = 'ceti-recommended-toggle';
+
+  const checkbox = document.createElement('input');
+
+  checkbox.type = 'checkbox';
+
+  checkbox.addEventListener('change', () => {
+    label.classList.toggle(
+      'is-checked',
+      checkbox.checked
     );
 
-    if (
-      !link ||
-      document.getElementById('ceti-recommended-toggle')
-    ) {
-      return;
-    }
+    onChange(checkbox.checked);
+  });
 
-    const filterItem = document.createElement('li');
+  const text = document.createElement('span');
 
-    filterItem.className = 'ceti-recommended-filter';
+  text.textContent = 'Apenas notícias recomendadas';
 
-    const label = document.createElement('label');
+  label.append(checkbox, text);
+  filterItem.appendChild(label);
 
-    label.id = 'ceti-recommended-toggle';
-    label.className = 'ceti-recommended-toggle';
+  const blogItem = link.closest('li');
 
-    const checkbox = document.createElement('input');
-
-    checkbox.type = 'checkbox';
-
-    checkbox.addEventListener('change', () => {
-      label.classList.toggle(
-        'is-checked',
-        checkbox.checked
-      );
-
-      onChange(checkbox.checked);
-    });
-
-    const text = document.createElement('span');
-
-    text.textContent = 'Apenas notícias recomendadas';
-
-    label.append(checkbox, text);
-    filterItem.appendChild(label);
-
-    const blogItem = link.closest('li');
-
-    if (blogItem?.parentElement) {
-      blogItem.parentElement.insertBefore(
-        filterItem,
-        blogItem.nextSibling
-      );
-    } else {
-      link.parentElement?.appendChild(filterItem);
-    }
+  if (blogItem?.parentElement) {
+    blogItem.parentElement.insertBefore(
+      filterItem,
+      blogItem.nextSibling
+    );
+  } else {
+    link.parentElement?.appendChild(filterItem);
   }
+}
 
   function setupSearchForm() {
     if (!location.pathname.includes('/search')) return;
