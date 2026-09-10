@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { extractArchivePosts, extractNextPage, parseFeed } from '../scripts/build-search-index.mjs';
+import { extractArchivePosts, extractNextPage, parseFeed, cleanPost } from '../scripts/build-search-index.mjs';
+
+test('converte acentos no estado já recolhido e conserva a identificação', () => {
+  const post = cleanPost({ id: 'blog-post-123', path: '/cinema-eacute-tudo-isso---blog/teste', title: 'Anima&ccedil;&atilde;o', text: 'Tr&ecirc;s pa&iacute;ses, &ldquo;cinema&rdquo; e pr&eacute;mios. SEÇÕES' });
+  assert.equal(post.id, 'blog-post-123');
+  assert.equal(post.title, 'Animação');
+  assert.equal(post.text, 'Três países, “cinema” e prémios.');
+});
 
 test('os campos dos posts não retêm o HTML completo das páginas', () => {
   const moduleUrl = new URL('../scripts/build-search-index.mjs', import.meta.url).href;

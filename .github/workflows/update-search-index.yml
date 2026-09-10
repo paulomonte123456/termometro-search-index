@@ -7,6 +7,8 @@ on:
       - ".github/workflows/update-search-index.yml"
       - "scripts/**"
       - "package.json"
+      - "package-lock.json"
+      - "public/**"
   schedule:
     - cron: "7,22,37,52 * * * *"
     - cron: "13 4 * * 0"
@@ -41,12 +43,14 @@ jobs:
         with:
           node-version: 22
 
+      - name: Instalar dependências
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
       - name: Escolher actualização
         id: mode
         shell: bash
         run: |
           mode="incremental"
-          if [[ "${{ github.event_name }}" == "push" ]]; then mode="full"; fi
           if [[ "${{ github.event.schedule }}" == "13 4 * * 0" ]]; then mode="full"; fi
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.full }}" == "true" ]]; then mode="full"; fi
           if [[ "$mode" == "incremental" ]]; then
