@@ -37,7 +37,7 @@ jobs:
     timeout-minutes: 180
 
     outputs:
-      changed: ${{ steps.index.outputs.changed }}
+      publish: ${{ steps.publish.outputs.publish }}
 
     steps:
       - name: Obter repositório
@@ -65,24 +65,19 @@ jobs:
             mode="full"
           fi
 
-          if [[ "$mode" == "incremental" ]]; then
-            mkdir -p data
-
-            if ! curl \
-              --fail \
-              --silent \
-              --show-error \
-              --location \
-              --retry 3 \
-              --max-time 30 \
-              "https://paulomonte123456.github.io/termometro-search-index/estado.json" \
-              -o data/search-state.json; then
-
-              echo "O estado publicado não respondeu."
-              echo "Será feita uma reconstrução completa."
-              mode="full"
-            fi
-          fi
+          # Recuperar sempre a base para validar e preservar o histórico.
+          mkdir -p data
+          curl --fail --silent --show-error --location --retry 3 --max-time 30 \
+            "https://paulomonte123456.github.io/termometro-search-index/estado.json" \
+            -o data/search-state.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const state = JSON.parse(fs.readFileSync('data/search-state.json'));
+          if (state.version !== 1 || !Array.isArray(state.posts) || !state.posts.length) {
+            throw new Error('Base publicada inválida. Atualização interrompida para preservar o índice.');
+          }
+          NODE
+          cp data/search-state.json "$RUNNER_TEMP/search-before.json"
 
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
 
@@ -107,19 +102,65 @@ jobs:
 
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
+      - name: Validar preservação dos posts
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const read = file => JSON.parse(fs.readFileSync(file));
+          const before = read(path.join(process.env.RUNNER_TEMP, 'search-before.json'));
+          const after = read('public/estado.json');
+          if (after.version !== 1 || !Array.isArray(after.posts) || !after.posts.length) throw new Error('Índice de pesquisa inválido ou vazio.');
+          const paths = new Set(after.posts.map(post => post.path));
+          const ids = new Set(after.posts.map(post => post.id));
+          if (paths.size !== after.posts.length || ids.size !== after.posts.length) throw new Error('Há posts duplicados no índice.');
+          const missing = before.posts.filter(post => !paths.has(post.path));
+          if (missing.length) throw new Error(`Publicação bloqueada: ${missing.length} posts desapareceriam. O índice publicado foi preservado.`);
+          const manifest = read('public/manifest.json');
+          const publicPosts = read('public/posts.json').posts;
+          if (manifest.posts !== after.posts.length || Object.keys(publicPosts).length !== after.posts.length || after.posts.some(post => !Object.hasOwn(publicPosts, post.id))) throw new Error('Contagens dos ficheiros de pesquisa não correspondem.');
+          for (const shard of manifest.shards) read(path.join('public/palavras', `${shard}.json`));
+          console.log(`Verificado: ${before.posts.length} posts anteriores preservados; ${after.posts.length} posts no índice.`);
+          NODE
+
+      - name: Escolher publicação
+        id: publish
+        env:
+          INDEX_CHANGED: ${{ steps.index.outputs.changed }}
+          EVENT_NAME: ${{ github.event_name }}
+        shell: bash
+        run: |
+          publish="$INDEX_CHANGED"
+          # Recordar a versão publicada permite repetir um deploy falhado.
+          sha256sum scripts/build-search-index.mjs public/busca.js package.json package-lock.json \
+            .github/workflows/update-search-index.yml | sha256sum | cut -d ' ' -f 1 > public/build-version.txt
+          if ! curl --fail --silent --show-error --location --retry 2 --max-time 30 \
+            "https://paulomonte123456.github.io/termometro-search-index/build-version.txt" \
+            -o "$RUNNER_TEMP/search-published-version.txt"; then
+            publish=true
+          elif ! cmp -s public/build-version.txt "$RUNNER_TEMP/search-published-version.txt"; then
+            publish=true
+          fi
+          # Alterações de código e pedidos manuais também precisam de publicação.
+          if [[ "$EVENT_NAME" == "push" || "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            publish=true
+          fi
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
       - name: Configurar GitHub Pages
-        if: steps.index.outputs.changed == 'true'
+        if: steps.publish.outputs.publish == 'true'
         uses: actions/configure-pages@v5
 
       - name: Preparar publicação
-        if: steps.index.outputs.changed == 'true'
+        if: steps.publish.outputs.publish == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: public
 
   deploy:
     needs: build
-    if: needs.build.outputs.changed == 'true'
+    if: needs.build.outputs.publish == 'true'
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
